@@ -6,6 +6,9 @@ import bodyParser from 'body-parser'
 import { getMicroUrl } from './util';
 import db from './database/client';
 import morgan from 'morgan'
+import {
+    getCurrentEpochInSeconds
+} from './util'
 
 const app = express();
 const port = 3000;
@@ -15,10 +18,6 @@ app.use(bodyParser.json())
 
 /**Morgan middle ware for logging */
 app.use(morgan('tiny'))
-
-function getCurrentEpochInSeconds() {
-    return Math.floor(Date.now() / 1000)
-}
 
 app.get('/', async (req, res) => {
     res.send("Hello world from microUrlService")
@@ -30,11 +29,11 @@ app.get('/:postfix', async (req, res) => {
     } = req.params
 
     const query = `SELECT * FROM urls where postfixKey = '${postfix}'`
-    const url:Url = await db(query).then(res => res[0])
+    const url: Url = await db(query).then(res => res[0])
 
-    if(url){
+    if (url) {
         res.redirect(url.originalUrl)
-    }else{
+    } else {
         res.send(`Oops, no url detected.`)
     }
 })

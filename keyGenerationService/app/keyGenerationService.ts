@@ -6,14 +6,13 @@ import { GetPostfixResponse } from './constant/apiRequestResponse';
 import { AvailableKey } from './constant/types';
 import db from './database/client';
 import morgan from 'morgan'
+import { getCurrentEpochInSeconds } from './util'
 
 const app = express();
 const port = config.port;
 
-/**Bodyparser middleware */
+/**Middleware */
 app.use(bodyParser.json())
-
-/**Morgan middle ware for logging */
 app.use(morgan('tiny'))
 
 app.get('/', async (req, res) => {
@@ -23,10 +22,6 @@ app.get('/', async (req, res) => {
 app.get('/healthcheck', async (req, res) => {
     res.status(200).send(true)
 })
-
-function getCurrentEpochInSeconds() {
-    return Math.floor(Date.now() / 1000)
-}
 
 let isRunning = false
 async function generateAvailableKeys(limit: number = 10): Promise<AvailableKey[]> {
@@ -64,7 +59,6 @@ async function generateAvailableKeys(limit: number = 10): Promise<AvailableKey[]
         return keys
     }
 }
-
 app.get('/key', async (req, res) => {
     try {
         /**Get one key */
@@ -78,7 +72,7 @@ app.get('/key', async (req, res) => {
             availableKey = await generateAvailableKeys(1).then(res => res[0])
 
             generateAvailableKeys()
-        }else{
+        } else {
             /**Generate unavailablekey and remove availablekey, async */
             const q1 = `INSERT INTO unavailableKeys (postfixKey, createdAt) VALUES ('${availableKey.postfixKey}', ${getCurrentEpochInSeconds()})`
             db(q1)
@@ -105,7 +99,6 @@ app.get('/key', async (req, res) => {
         res.status(500).json(response)
     }
 })
-
 
 app.listen(port, () => {
     console.log(`keyGenerationService is running on port ${port}.`);
