@@ -1,6 +1,6 @@
 export type Url = {
     originalUrl: string,
-    key: string,
+    postfixKey: string,
     createdAt: number,
     updatedAt: number,
 }

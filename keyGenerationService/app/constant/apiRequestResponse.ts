@@ -1,9 +1,9 @@
-export type CreateUrlRequest = {
-    originalUrl: string
+export type GetPostfixRequest = {
+    
 }
 
-export type CreateUrlResponse = {
+export type GetPostfixResponse = {
     success: boolean,
     message: string | null,
-    url: string
+    postfix: string
 }

@@ -1,9 +1,11 @@
 import express from 'express';
 import { CreateUrlRequest, CreateUrlResponse } from './constant/apiRequestResponse';
 import { Url } from './constant/types';
-import { getKey } from './external/ksg/ksg';
+import { getPostfixKey, GetPostfixRequest, GetPostfixResponse } from './external/ksg/ksg';
 import bodyParser from 'body-parser'
 import { getMicroUrl } from './util';
+import db from './database/client';
+import morgan from 'morgan'
 
 const app = express();
 const port = 3000;
@@ -11,48 +13,78 @@ const port = 3000;
 /**Bodyparser middleware */
 app.use(bodyParser.json())
 
+/**Morgan middle ware for logging */
+app.use(morgan('tiny'))
+
+function getCurrentEpochInSeconds() {
+    return Math.floor(Date.now() / 1000)
+}
 
 app.get('/', async (req, res) => {
     res.send("Hello world from microUrlService")
 })
 
+app.get('/:postfix', async (req, res) => {
+    const {
+        postfix
+    } = req.params
 
-app.post('/', async (req, res) => {
-        try {
-            const body: CreateUrlRequest = req.body
-            const {
-                originalUrl
-            } = body
-            if(!originalUrl) throw new Error("Missing property \"originalUrl\"")
+    const query = `SELECT * FROM urls where postfixKey = '${postfix}'`
+    const url:Url = await db(query).then(res => res[0])
 
-            const key = await getKey()
+    if(url){
+        res.redirect(url.originalUrl)
+    }else{
+        res.send(`Oops, no url detected.`)
+    }
+})
 
-            if (key) {
-                throw new Error("No key found")
-            }
+app.post('/createUrl', async (req, res) => {
+    try {
+        const body: CreateUrlRequest = req.body
+        const {
+            originalUrl
+        } = body
+        if (!originalUrl) throw new Error("Missing property 'originalUrl'")
 
-            const url: Url = {
-                originalUrl: originalUrl,
-                key: key,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            }
-
-            const response: CreateUrlResponse = {
-                success: true,
-                message: null,
-                url: getMicroUrl(url.key)
-            }
-
-            res.json(response)
-
-        } catch (err) {
-            const message = err instanceof Error ? err.message : err
-            res.status(500).send(message)
+        const getKeyRequest: GetPostfixRequest = {}
+        const getKeyResponse = await getPostfixKey(getKeyRequest)
+        const { postfix } = getKeyResponse
+        if (!postfix) {
+            throw new Error("No key found")
         }
-    })
+
+        const url: Url = {
+            originalUrl: originalUrl,
+            postfixKey: postfix,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        }
+
+        const q1 = `INSERT INTO urls (originalUrl, postfixKey, createdAt, updatedAt) VALUES ('${url.originalUrl}', '${url.postfixKey}',${getCurrentEpochInSeconds()},${getCurrentEpochInSeconds()})`
+        await db(q1)
+
+        const response: CreateUrlResponse = {
+            success: true,
+            message: null,
+            url: getMicroUrl(url.postfixKey)
+        }
+
+        res.json(response)
+
+    } catch (err) {
+        const message = err instanceof Error ? err.message : err
+
+        const response: CreateUrlResponse = {
+            success: false,
+            message: message,
+            url: null
+        }
+        res.status(500).json(response)
+    }
+})
 
 
 app.listen(port, () => {
-    console.log(`Timezones by location application is running on port ${port}.`);
+    console.log(`MicrourlService is running on port ${port}.`);
 });
