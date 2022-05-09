@@ -1,0 +1,25 @@
+version: '2'
+services:
+  # web:
+  #   build: .
+  #   command: node microUrlService.ts
+  #   ports:
+  #     - "8080:3000"
+  #   depends_on:
+  #     - db
+  #   environment:
+  #     PORT=3000
+  #     DOMAIN_NAME=https://www.microurl.com
+  #     KSG_API=http://localhost:4000
+  #     DATABASE_HOST=localhost
+  #     DATABASE_USER=daniel
+  #     DATABASE_PASSWORD=r5FevxcwDjFbXN
+  #     DATABASE_NAME=micro_url_service
+  db:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: k4id39zrVHSm23
+      MYSQL_DATABASE: micro_url_service
+    ports:
+    - "3306:3306"
