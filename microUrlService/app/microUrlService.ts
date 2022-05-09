@@ -4,14 +4,18 @@ import { Url } from './constant/types';
 import { getPostfixKey, GetPostfixRequest, GetPostfixResponse } from './external/ksg/ksg';
 import bodyParser from 'body-parser'
 import { getMicroUrl } from './util';
-import db from './database/client';
+import db from './database/mysql';
 import morgan from 'morgan'
 import {
     getCurrentEpochInSeconds
 } from './util'
+import config from './config';
 
 const app = express();
-const port = 3000;
+const port = config.port;
+
+app.set('view engine', 'ejs');
+
 
 /**Bodyparser middleware */
 app.use(bodyParser.json())
@@ -20,7 +24,18 @@ app.use(bodyParser.json())
 app.use(morgan('tiny'))
 
 app.get('/', async (req, res) => {
-    res.send("Hello world from microUrlService")
+    const urls = await db(`SELECT * FROM urls`) as Url[]
+
+    const formattedUrls = urls.map(url => {
+        return {
+            ...url,
+            redirectUrl: getMicroUrl(url.postfixKey)
+        }
+    })
+
+    res.render('index.ejs', {
+        formattedUrls
+    })
 })
 
 app.get('/:postfix', async (req, res) => {

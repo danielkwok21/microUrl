@@ -4,9 +4,11 @@ import { nanoid } from 'nanoid';
 import config from './config';
 import { GetPostfixResponse } from './constant/apiRequestResponse';
 import { AvailableKey } from './constant/types';
-import db from './database/client';
+import db from './database/mysql';
 import morgan from 'morgan'
-import { getCurrentEpochInSeconds } from './util'
+import { getCurrentEpochInSeconds, logger } from './util'
+import redisClient, { REDIS_KEYS } from './database/redis';
+import winston from 'winston'
 
 const app = express();
 const port = config.port;
@@ -61,10 +63,22 @@ async function generateAvailableKeys(limit: number = 10): Promise<AvailableKey[]
 }
 app.get('/key', async (req, res) => {
     try {
-        /**Get one key */
-        let availableKey: AvailableKey = await db(`SELECT * FROM availableKeys LIMIT 1`).then(res => res[0])
+        /**Get one key from redis, fallback db*/
+        let availableKey: AvailableKey
+
+        logger.info("Getting 1 available key from cache...")
+        const json = await redisClient.lRange(REDIS_KEYS.availableKeys, 0, -1).then(res => res[0])
+        availableKey = json ? JSON.parse(json)[0] : null
+        if (!availableKey) {
+            logger.error(`Cache miss. Getting from db...`)
+            availableKey = await db(`SELECT * FROM availableKeys LIMIT 1`).then(res => res[0])
+        }else{
+            logger.info(`Cache hit`)
+            await redisClient.rPop(JSON.stringify(availableKey))
+        }
 
         if (!availableKey) {
+            logger.error(`No more availableKeys in db`)
             /**
              * If no keys found, generate one first, and return it
              * Then, spin off separate process to generate more keys, async 
@@ -100,6 +114,17 @@ app.get('/key', async (req, res) => {
     }
 })
 
+app.get('/warmup-redis', async (req, res) => {
+    const availableKeys = await db(`SELECT * FROM availableKeys`) as AvailableKey[]
+
+    redisClient.del(REDIS_KEYS.availableKeys)
+    redisClient.lPush(REDIS_KEYS.availableKeys, JSON.stringify(availableKeys))
+
+    res.json({
+        success: true
+    })
+})
+
 app.listen(port, () => {
-    console.log(`keyGenerationService is running on port ${port}.`);
+    logger.info(`keyGenerationService is running on port ${port}.`)
 });
